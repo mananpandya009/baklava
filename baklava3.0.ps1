@@ -166,13 +166,12 @@ else
    $arrayprof = Get-ChildItem $profilepath
    $state1 = "C:\Program Files (x86)\Quarantine\State\*"
    $manifest1 = "C:\Program Files (x86)\Quarantine\Manifests"
-   $userprof = "C:\Users"
    $child = Get-ChildItem -Path "C:\Users\*" -Exclude "Public","$cuser","Default","$aduser"
 
 function inspectbakprofiles
 {
     param($prof)
-
+   
     if ("$prof" -match ".*\.bak$") {
         $Host.UI.RawUI.BackgroundColor = "Black"
         $Host.UI.RawUI.ForegroundColor = "Red"
@@ -181,7 +180,7 @@ function inspectbakprofiles
         Write-Output($temp)
         $Host.UI.RawUI.BackgroundColor = "Black"
         $Host.UI.RawUI.ForegroundColor = "Gray"
-        $arrayprof = Get-ChildItem $profilepath
+    
     }
     else {
         $Host.UI.RawUI.BackgroundColor = "Black"
@@ -195,15 +194,15 @@ function inspectbakprofiles
 function findbakprofiles
     {
         param($prof)
-    
-        if ("$prof" -match ".*\.bak$") {
+       if ("$prof" -match ".*\.bak$") {
             $Host.UI.RawUI.BackgroundColor = "Black"
        $Host.UI.RawUI.ForegroundColor = 'Red'
-            Write-Output "Found corrupted profile registry, removing :)"
-            $temp = "S" + $prof.TrimStart("HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows NT\CurrentVersion\ProfileList")
-            Write-Output($temp)
-            Remove-Item -path $temp -force -recurse -ErrorAction 'silentlycontinue' #Requires -RunAsAdministrator
-            $arrayprof = Get-ChildItem $profilepath
+            Write-Output "Found corrupted profile, fixing :)"
+          
+            $temp2 = "S" + $prof.TrimStart("HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows NT\CurrentVersion\ProfileList")
+            Write-Output($temp2)
+            Remove-Item -path $temp2 -force -recurse -ErrorAction 'silentlycontinue' #Requires -RunAsAdministrator
+       
         }
         else {
             $Host.UI.RawUI.BackgroundColor = "Black"
@@ -217,28 +216,19 @@ function findbakprofiles
 function wiper {
     param ($_)
     try{
-		foreach ($fol in $child) {
-			Write-Host "$fol"
-			
-			$acl = Get-Acl -path $fol
-		
-		    $object = New-Object System.Security.Principal.Ntaccount("$cuser")
-		
-		    $acl.SetOwner($object)
-		
-		    $acl | Set-Acl -path $fol -ErrorAction 'silentlycontinue'
+	
             $Host.UI.RawUI.BackgroundColor = "Black"
             $Host.UI.RawUI.ForegroundColor = "Blue"
-            Write-Host "Removing $fol"
-        
-            remove-item -path "$fol" -force -recurse -ErrorAction 'silentlycontinue' #Requires -RunAsAdministrator
-            
+            Write-Host "Clearing profiles...."
+            Get-CimInstance -Class Win32_UserProfile | Remove-CimInstance -ErrorAction 'silentlycontinue' #Requires -RunAsAdministrator
+            get-cimin
+     
 		    }
 		}
 	catch{
         $Host.UI.RawUI.BackgroundColor = "Black"
         $Host.UI.RawUI.ForegroundColor = "Red"
-			"Error removing $fol"
+			"Error removing profiles"
 		} 
 }
    
@@ -271,7 +261,8 @@ function qstate {
 
             $Host.UI.RawUI.BackgroundColor = "Black"
             $Host.UI.RawUI.ForegroundColor = "Red"
-			"Error : Quarantine 1" 
+            "Error : Quarantine 1" 
+            $Host.UI.RawUI.ForegroundColor = "Gray"
         }		
 }
 
@@ -300,8 +291,10 @@ function qman {
         $Host.UI.RawUI.ForegroundColor = "Gray"
 		}
 		catch{
-		
-			"Error : Quarantine 2"
+            $Host.UI.RawUI.BackgroundColor = "Black"
+            $Host.UI.RawUI.ForegroundColor = "Red"
+            "Error : Quarantine 2"
+            $Host.UI.RawUI.ForegroundColor = "Gray"
 		} 
 }
 
@@ -333,7 +326,7 @@ function printa {
                 
                    foreach ($pr in $localprinter) {
                       $pr = $localprinter.Name[$i]
-                      $temp=$pr.TrimStart("\\wcpm-print-lb.amazon.com\")
+                      $temp=$pr.TrimStart("\\printserver.xyz.com\")
                       if ($uprinter -match $temp) {
                         $j=$j+1
                       }
@@ -344,7 +337,7 @@ function printa {
                    Write-host "$uprinter already exists"
                 }
                 else {
-                   rundll32 printui.dll PrintUIEntry /in /n \\wcpm-print-lb.amazon.com\$uprinter
+                   rundll32 printui.dll PrintUIEntry /in /n \\printserver.xyz.com\$uprinter
                    $Host.UI.RawUI.ForegroundColor = "Green"
                    Write-Output "$uprinter added successfully!!"
                    $Host.UI.RawUI.BackgroundColor = "Black"
@@ -361,25 +354,59 @@ function printa {
              } 
 }
 
+
+function bitlockme {
+    param ($_)
+    
+                if ($env:USERNAME -notmatch ".*\-admin$") {
+                    $adminbit = $env:USERNAME + "-admin"
+                }
+
+                else {
+                    $adminbit = $env:USERNAME
+                }
+                $Host.UI.RawUI.BackgroundColor = "Black"
+                $Host.UI.RawUI.ForegroundColor = "Gray"               
+                $cred = Get-Credential -Message "Hello $env:USERNAME, please enter your admin password: " -UserName $adminbit
+                $computer1 = Read-Host "Please enter the serial number"
+                $computer = "LGA9-" + $computer1
+                $objcomputer = Get-ADComputer -identity $computer -Server abc.xyz.com -Credential $cred
+                $bitobj = Get-ADObject -Filter {objectclass -eq 'msFVE-RecoveryInformation'} -SearchBase $objComputer.DistinguishedName -Properties 'msFVE-RecoveryPassword' -Server abc.xyz.com -Credential $cred | Sort-Object -Property 'Name' -Descending
+                $temp = $bitobj
+                $Host.UI.RawUI.BackgroundColor = "Black"
+                $Host.UI.RawUI.ForegroundColor = "Yellow"
+                Write-Output "Bitlocker key for $computer :"
+                Write-Output $temp[0].'msFVE-RecoveryPassword'
+
+
+}
+
+
 function Show-Menu
 {
      param (
            [string]$Title = 'My Menu'
      )
      Clear-Host
-
+     $cuser=$env:USERNAME
+     $aduser = $cuser + "-admin"
+     $profilepath = set-location -path "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\ProfileList"
+     $arrayprof = Get-ChildItem $profilepath
+     $state1 = "C:\Program Files (x86)\Quarantine\State\*"
+     $manifest1 = "C:\Program Files (x86)\Quarantine\Manifests"
+     $child = Get-ChildItem -Path "C:\Users\*" -Exclude "Public","$cuser","Default","$aduser"
 Write-Output "`n"
-     $Host.UI.RawUI.BackgroundColor = "Black"
-     $Host.UI.RawUI.ForegroundColor = "Red"
-   "-------------------------------------"
-   "| Baklava - Fixes corrupted registry|"
-   $Host.UI.RawUI.BackgroundColor = "Black"
-   $Host.UI.RawUI.ForegroundColor = "White"
-   "| Creator:  Manan Pandya            |"
-   $Host.UI.RawUI.BackgroundColor = "Black"
-   $Host.UI.RawUI.ForegroundColor = "Blue"
-   "| Email:    panmanan@amazon.com     |"
-   "-------------------------------------"
+$Host.UI.RawUI.BackgroundColor = "Black"
+$Host.UI.RawUI.ForegroundColor = "Red"
+"--------------------------------------------------------"
+"| Baklava - Fix Almost Everything                |"
+$Host.UI.RawUI.BackgroundColor = "Black"
+$Host.UI.RawUI.ForegroundColor = "White"
+"| Creator:  Manan Pandya                             |"
+$Host.UI.RawUI.BackgroundColor = "Black"
+$Host.UI.RawUI.ForegroundColor = "Blue"
+"| Email:    mananpandya009@gmail.com   |"
+"---------------------------------------------------------"
      Write-Output "`n"
      $Host.UI.RawUI.BackgroundColor = "Black"
      $Host.UI.RawUI.ForegroundColor = "Yellow"
@@ -392,7 +419,8 @@ Write-Output "`n"
      Write-Output "(4)Fix quarantine issues"
      Write-Output "(5)Connect to a printer"
      Write-Output "(6)Reset printer spooler"
-     Write-Output "(7)Rejoin ANT domain"
+     Write-Output "(7)Rejoin XYZ domain"
+     Write-Output "(8)Find Bitlocker recovery key"
      Write-Output "(Q)To Quit"
 }
 do
@@ -409,6 +437,7 @@ do
                     $prof = $arrayprof[$i].Name
                     inspectbakprofiles($prof)
                     $i = $i+1
+                    $arrayprof = Get-ChildItem $profilepath
                }
                $Host.UI.RawUI.BackgroundColor = "Black"
                $Host.UI.RawUI.ForegroundColor = "Red"
@@ -434,7 +463,9 @@ do
                {
                     $prof = $arrayprof[$j].Name
                     findbakprofiles($prof)
+                    
                     $j = $j+1
+                    $arrayprof = Get-ChildItem $profilepath
                }
                $Host.UI.RawUI.BackgroundColor = "Black"
                $Host.UI.RawUI.ForegroundColor = "Red"
@@ -455,7 +486,12 @@ do
                "''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''"
                $Host.UI.RawUI.ForegroundColor = "Gray"
            } '3' {
-               wiper($_)
+               
+             
+            wiper($_)
+               $Host.UI.RawUI.BackgroundColor = "Black"
+               $Host.UI.RawUI.ForegroundColor = "Blue"
+               Write-Output "Remving User profile data :)"
                $Host.UI.RawUI.BackgroundColor = "Black"
                $Host.UI.RawUI.ForegroundColor = "Red"
                "''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''"
@@ -533,10 +569,14 @@ do
         } 
         '7' {
             try {
-                Write-Host "Please enter your admin credentials"
-                $PSCredential = Get-Credential | Out-Null
-                Reset-ComputerMachinePassword -Server ant.amazon.com -Credential $PSCredential
-                Write-Host "Successfully joined ANT.amazon.com"
+                $Host.UI.RawUI.BackgroundColor = "Black"
+                $Host.UI.RawUI.ForegroundColor = "Blue"
+                Reset-ComputerMachinePassword -Server abc.xyz.com -Credential $PSCredential
+                $Host.UI.RawUI.BackgroundColor = "Black"
+                $Host.UI.RawUI.ForegroundColor = "Green"
+                Write-Host "Successfully joined Abc.xyz.com"
+                $Host.UI.RawUI.BackgroundColor = "Black"
+                $Host.UI.RawUI.ForegroundColor = "Yellow"
                 $inpu = Read-Host "Would you like to reboot system(recommended)? - Y/N"
                 if ($inpu -match "Y") {
                     shutdown -r -f -t 3
@@ -564,7 +604,9 @@ do
                } 
             }
             catch {
-                Write-Host "Error joining ANT,please return to menu"
+                $Host.UI.RawUI.BackgroundColor = "Black"
+                $Host.UI.RawUI.ForegroundColor = "Red"
+                Write-Host "Error joining XYZ,please return to menu"
                 $Host.UI.RawUI.BackgroundColor = "Black"
                 $Host.UI.RawUI.ForegroundColor = "Red"
                 "''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''"
@@ -586,6 +628,59 @@ do
             }
          
         }
+        '8' {
+           try {
+               
+          
+            bitlockme($_)
+
+                $Host.UI.RawUI.BackgroundColor = "Black"
+                $Host.UI.RawUI.ForegroundColor = "Red"
+                "''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''"
+                "'''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''.-::///:-.'''''''''''''''''''''''''"
+                "'''''''''''''''''''''''''-+/.'''''''''''''''''''''''''''''''''''''''''''''''''''-+ooooooossss'''''''''''''''''''''''''"
+                "''''''''''''''''''''''''''':os+/-''''''''''''''''''''''''''''''''''''''''''''''''''''''''.sso'''''''''''''''''''''''''"
+                $Host.UI.RawUI.BackgroundColor = "Black"
+                $Host.UI.RawUI.ForegroundColor = "White"
+                "'''''''''''''''''''''''''''''./ssso+:-.''''''''''''''''''''''''''''''''''''''''''.:/oso'':ss-'''''''''''''''''''''''''"
+                "''''''''''''''''''''''''''''''''-/ossssso+/:-.'''''''''''''''''''''''''''..-:/+sssso/.'''ss/''''''''''''''''''''''''''"
+                "'''''''''''''''''''''''''''''''''''.:/osssssssssoo++///:::::::::://++oosssssssso+:.'''''+s:'''''''''''''''''''''''''''"
+                $Host.UI.RawUI.BackgroundColor = "Black"
+                $Host.UI.RawUI.ForegroundColor = "Blue"
+                "''''''''''''''''''''''''''''''''''''''''-:+osssssssssssssssssssssssssssssso+:-'''''''''./.''''''''''''''''''''''''''''"
+                "''''''''''''''''''''''''''''''''''''''''''''''.-:/++oossssssssssoo++/:-.''''''''''''''''''''''''''''''''''''''''''''''"
+                "''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''"
+                "''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''"
+                $Host.UI.RawUI.ForegroundColor = "Gray"
+
+           }
+                catch{
+                    $Host.UI.RawUI.BackgroundColor = "Black"
+                    $Host.UI.RawUI.ForegroundColor = "Yellow"
+                    Write-output "Error finding bitlocker key"
+                    $Host.UI.RawUI.BackgroundColor = "Black"
+                    $Host.UI.RawUI.ForegroundColor = "Red"
+                    "''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''"
+                    "'''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''.-::///:-.'''''''''''''''''''''''''"
+                    "'''''''''''''''''''''''''-+/.'''''''''''''''''''''''''''''''''''''''''''''''''''-+ooooooossss'''''''''''''''''''''''''"
+                    "''''''''''''''''''''''''''':os+/-''''''''''''''''''''''''''''''''''''''''''''''''''''''''.sso'''''''''''''''''''''''''"
+                    $Host.UI.RawUI.BackgroundColor = "Black"
+                    $Host.UI.RawUI.ForegroundColor = "White"
+                    "'''''''''''''''''''''''''''''./ssso+:-.''''''''''''''''''''''''''''''''''''''''''.:/oso'':ss-'''''''''''''''''''''''''"
+                    "''''''''''''''''''''''''''''''''-/ossssso+/:-.'''''''''''''''''''''''''''..-:/+sssso/.'''ss/''''''''''''''''''''''''''"
+                    "'''''''''''''''''''''''''''''''''''.:/osssssssssoo++///:::::::::://++oosssssssso+:.'''''+s:'''''''''''''''''''''''''''"
+                    $Host.UI.RawUI.BackgroundColor = "Black"
+                    $Host.UI.RawUI.ForegroundColor = "Blue"
+                    "''''''''''''''''''''''''''''''''''''''''-:+osssssssssssssssssssssssssssssso+:-'''''''''./.''''''''''''''''''''''''''''"
+                    "''''''''''''''''''''''''''''''''''''''''''''''.-:/++oossssssssssoo++/:-.''''''''''''''''''''''''''''''''''''''''''''''"
+                    "''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''"
+                    "''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''"
+                    $Host.UI.RawUI.ForegroundColor = "Gray"
+                }
+
+        }
+
+
 
           'q' {
                return
